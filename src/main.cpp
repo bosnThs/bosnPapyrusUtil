@@ -331,28 +331,17 @@ struct myPapyrusUtil
 
 struct hooks
 {
-    static void updateCamera(RE::TESCamera* a_this)
-    {
-        _updateCamera(a_this);
-    }
-    static inline REL::Relocation<decltype(updateCamera)> _updateCamera;
-
     struct TESCamera_Update
     {
         static void thunk(RE::TESCamera* a_camera)
         {
             func(a_camera);
-            //if (a_camera->zoomInput < 100)
-                a_camera->zoomInput = 5000;
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
 
     static void install()
     {
-        //REL::Relocation<std::uintptr_t> UpdateCameraHandlerVtbl{ RE::VTABLE_TESCamera[0] };
-        //_updateCamera = UpdateCameraHandlerVtbl.write_vfunc(0x2, updateCamera);
-
         REL::Relocation<std::uintptr_t> hook1{ RELOCATION_ID(49852, 50784) };  // 84AB90, 876700
         stl::write_thunk_call<TESCamera_Update>(hook1.address() + REL::Relocate(0x1A6, 0x1A6));
     }
