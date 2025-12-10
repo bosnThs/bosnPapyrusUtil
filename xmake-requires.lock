@@ -30,7 +30,7 @@
         ["ninja#31fecfc4"] = {
             repo = {
                 branch = "master",
-                commit = "a77af71e04308fb8a16deb6f8d90ace6acea3209",
+                commit = "7e9857ec74d6ecaad0156a7f12facb51086922bc",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
             version = "1.12.1"

@@ -9,3 +9,4 @@ String Function inventoryDecorator(Actor a_actor) global native
 ObjectReference Function getLoadedREFbyName(ObjectReference a_origin, float a_distance, String a_npcName) global native 
 String Function getLoadedREFbyTypeAsString(ObjectReference a_origin, float a_distance, int a_formType, bool a_allowSteal) global native 
 ObjectReference[] Function getLoadedREFListbyName(ObjectReference a_origin, float a_distance, String[] a_stringList, bool a_allowSteal) global native 
+String Function getNearbyLoadedRefsAsString(ObjectReference a_origin, float a_distance, int a_numRefs) global native 

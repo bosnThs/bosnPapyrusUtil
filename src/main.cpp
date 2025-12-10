@@ -100,7 +100,7 @@ struct myPapyrusUtil
         //auto player = RE::PlayerCharacter::GetSingleton();
         //clonePackageSpell(a_tag, player, "Sparks", a_pckage);
 
-        //auto s = getLoadedREFListbyName(a_tag, a_actor, 800, {"thistle", "Fly amanita", "Fly amanita" }, false);
+        //auto s = getNearbyLoadedRefsAsString(a_tag, a_actor, 600, 20);
 
 
         std::string inventoryString, weaponString, armorString, potionsString, scrollsString, foodString, ingredientsString, booksString, keysString, miscString = "";
@@ -119,7 +119,7 @@ struct myPapyrusUtil
                             weaponString += item->GetName();
                             if (count > 1)
                                 weaponString += "*" + std::to_string(count);
-                            weaponString += ", ";
+                            weaponString += "/ ";
                         }
                         break;
 
@@ -131,7 +131,7 @@ struct myPapyrusUtil
                                 armorString += item->GetName();
                                 if (count > 1)
                                     armorString += "*" + std::to_string(count);
-                                armorString += ", ";
+                                armorString += "/ ";
                             }
                         }
                         break;
@@ -142,7 +142,7 @@ struct myPapyrusUtil
                             potionsString += item->GetName();
                             if (count > 1)
                                 potionsString += "*" + std::to_string(count);
-                            potionsString += ", ";
+                            potionsString += "/ ";
                         }
 
                         if (item->As<RE::AlchemyItem>()->IsFood())
@@ -150,7 +150,7 @@ struct myPapyrusUtil
                             foodString += item->GetName();
                             if (count > 1)
                                 foodString += "*" + std::to_string(count);
-                            foodString += ", ";
+                            foodString += "/ ";
                         }
                         break;
 
@@ -158,35 +158,35 @@ struct myPapyrusUtil
                         scrollsString += item->GetName();
                         if (count > 1)
                             scrollsString += "*" + std::to_string(count);
-                        scrollsString += ", ";
+                        scrollsString += "/ ";
                         break;
 
                     case RE::FormType::Ingredient:
                         ingredientsString += item->GetName();
                         if (count > 1)
                             ingredientsString += "*" + std::to_string(count);
-                        ingredientsString += ", ";
+                        ingredientsString += "/ ";
                         break;
 
                     case RE::FormType::Book:
                         booksString += item->GetName();
                         if (count > 1)
                             booksString += "*" + std::to_string(count);
-                        booksString += ", ";
+                        booksString += "/ ";
                         break;
 
                     case RE::FormType::KeyMaster:
                         keysString += item->GetName();
                         if (count > 1)
                             keysString += "*" + std::to_string(count);
-                        keysString += ", ";
+                        keysString += "/ ";
                         break;
 
                     default:
                         miscString += item->GetName();
                         if (count > 1)
                             miscString += "*" + std::to_string(count);
-                        miscString += ", ";
+                        miscString += "/ ";
                         break;
                 }
             }
@@ -216,7 +216,7 @@ struct myPapyrusUtil
 
     static std::string inventoryDecorator(RE::StaticFunctionTag* a_tag, RE::Actor* a_actor)
     {
-        return getActorInventoryAsString(a_tag, a_actor->As<RE::TESObjectREFR>());
+        return getActorInventoryAsString(a_tag, a_actor->As<RE::TESObjectREFR>(), true);
     }
 
     static RE::SpellItem* getActorHasSpell(RE::Actor* a_actor, std::string a_spell)
@@ -331,8 +331,8 @@ struct myPapyrusUtil
                     if (a_ref->Is3DLoaded() && displayName != "" && displayName == s)
                     {
                         //allow steal check
-                        if (!a_allowSteal && a_ref->GetOwner() && a_ref->GetOwner() != RE::PlayerCharacter::GetSingleton()->As<RE::TESForm>())
-                            return RE::BSContainer::ForEachResult::kContinue;
+                        //if (!a_allowSteal && a_ref->GetOwner() && a_ref->GetOwner() != RE::PlayerCharacter::GetSingleton()->As<RE::TESForm>() && a_ref->GetOwner() != base->As<RE::TESForm>())
+                         //   return RE::BSContainer::ForEachResult::kContinue;
 
                         //
 
@@ -421,6 +421,57 @@ struct myPapyrusUtil
         return a_result;
     }
 
+    static std::string getNearbyLoadedRefsAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs)
+    {
+        auto tes = RE::TES::GetSingleton();
+        std::string a_result = "";
+        int counter = 0;
+        auto sourcePos = a_origin->GetPosition();
+        float sourceYaw = -a_origin->GetAngleZ();
+
+        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs, &sourcePos, &sourceYaw](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
+            if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
+            if (a_origin == a_ref) return RE::BSContainer::ForEachResult::kContinue;
+
+            RE::TESForm* base = a_ref->GetBaseObject();
+            if (!base) return RE::BSContainer::ForEachResult::kContinue;
+
+            std::string displayName = a_ref->GetDisplayFullName();
+            if (a_ref->Is3DLoaded() && displayName != "")
+            {
+                RE::NiPoint3 horiz = a_ref->GetPosition() - sourcePos;  horiz.z = 0;
+                RE::NiPoint3 hnorm = horiz;
+                hnorm.Unitize();
+
+                float fwd = hnorm.Dot(RE::NiPoint3(- std::sin(sourceYaw), std::cos(sourceYaw), 0));
+                float rgt = hnorm.Dot(RE::NiPoint3(std::cos(sourceYaw), std::sin(sourceYaw), 0));
+
+                std::string pos;
+                if (horiz.Length() < 100)
+                    pos += "close";
+                if (horiz.Length() > 400)
+                    pos += "far";
+                if (std::abs(fwd) > std::abs(rgt)) {
+                    pos += (fwd > 0) ? " in front" : " behind";
+                }
+                else {
+                    pos += (rgt > 0) ? " to the right" : " to the left";
+                }
+
+                a_result += "- " + displayName + " - " + pos + " (" + std::to_string(base->GetFormType()) + ")\n";
+                counter++;
+                if (counter == a_numRefs)
+                    return RE::BSContainer::ForEachResult::kStop;
+
+                return RE::BSContainer::ForEachResult::kContinue;
+            }
+
+            return RE::BSContainer::ForEachResult::kContinue;
+            });
+
+        //logs::info("(JSON format: {} ", a_result);
+        return a_result;
+    }
 
     static bool RegisterFuncsForSKSE(RE::BSScript::IVirtualMachine* a_vm) {
 
@@ -438,6 +489,7 @@ struct myPapyrusUtil
         a_vm->RegisterFunction("getLoadedREFbyName", "bosnPapyrusUtil", getLoadedREFbyName, false);
         a_vm->RegisterFunction("getLoadedREFbyTypeAsString", "bosnPapyrusUtil", getLoadedREFbyTypeAsString, false);
         a_vm->RegisterFunction("getLoadedREFListbyName", "bosnPapyrusUtil", getLoadedREFListbyName, false);
+        a_vm->RegisterFunction("getNearbyLoadedRefsAsString", "bosnPapyrusUtil", getNearbyLoadedRefsAsString, false);
 
         return true;
     }
