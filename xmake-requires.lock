@@ -38,10 +38,10 @@
         ["rapidcsv#31fecfc4"] = {
             repo = {
                 branch = "master",
-                commit = "b63e8c360de4f0cf3238608e3571c9258e20f76a",
+                commit = "7e9857ec74d6ecaad0156a7f12facb51086922bc",
                 url = "https://gitlab.com/tboox/xmake-repo.git"
             },
-            version = "v8.87"
+            version = "v8.90"
         },
         ["spdlog#9c36f0a9"] = {
             repo = {

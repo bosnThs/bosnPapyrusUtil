@@ -109,7 +109,7 @@ struct myPapyrusUtil
         for (auto& [item, data] : inventory)
         {
             const auto& [count, entry] = data;
-            if (count > 0 && item->GetName() != "")
+            if (count > 0 && item->GetName() != "" && item->GetPlayable())
             {
                 switch(item->GetFormType())
                 {
@@ -421,7 +421,7 @@ struct myPapyrusUtil
         return a_result;
     }
 
-    static std::string getNearbyLoadedRefsAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs)
+    static std::string getNearbyLoadedRefsAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs, bool simple = false)
     {
         auto tes = RE::TES::GetSingleton();
         std::string a_result = "";
@@ -429,7 +429,10 @@ struct myPapyrusUtil
         auto sourcePos = a_origin->GetPosition();
         float sourceYaw = -a_origin->GetAngleZ();
 
-        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs, &sourcePos, &sourceYaw](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
+        if (!a_origin)
+            return a_result;
+
+        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs, &sourcePos, &sourceYaw, &simple](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
             if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
             if (a_origin == a_ref) return RE::BSContainer::ForEachResult::kContinue;
 
@@ -458,7 +461,14 @@ struct myPapyrusUtil
                     pos += (rgt > 0) ? " to the right" : " to the left";
                 }
 
-                a_result += "- " + displayName + " - " + pos + " (" + std::to_string(base->GetFormType()) + ")\n";
+                if (simple)
+                {
+                    a_result += displayName + ", ";
+                }
+                else
+                {
+                    a_result += "- " + displayName + " - " + pos + " (" + std::to_string(base->GetFormType()) + ")\n";
+                }
                 counter++;
                 if (counter == a_numRefs)
                     return RE::BSContainer::ForEachResult::kStop;
@@ -471,6 +481,13 @@ struct myPapyrusUtil
 
         //logs::info("(JSON format: {} ", a_result);
         return a_result;
+    }
+
+    static void test()
+    {
+        auto manager = RE::BGSCreatedObjectManager::GetSingleton();
+        auto a = RE::BGSCreatedObjectManager::CreatedMagicItemData();
+
     }
 
     static bool RegisterFuncsForSKSE(RE::BSScript::IVirtualMachine* a_vm) {
@@ -502,6 +519,20 @@ struct hooks
         static void thunk(RE::TESCamera* a_camera)
         {
             func(a_camera);
+
+            auto* playerCamera = RE::PlayerCamera::GetSingleton();
+            RE::ThirdPersonState* thirdPersonState = nullptr;
+
+            bool bIsThirdPersonCamera = playerCamera->currentState->id == RE::CameraState::kThirdPerson;
+            bool bIsHorseCamera = playerCamera->currentState->id == RE::CameraState::kMount;
+            bool bIsDragonCamera = playerCamera->currentState->id == RE::CameraState::kDragon;
+
+            if (playerCamera && playerCamera->currentState && (bIsThirdPersonCamera && !bIsHorseCamera && !bIsDragonCamera)) {
+                thirdPersonState = static_cast<RE::ThirdPersonState*>(playerCamera->currentState.get());
+                auto fovControl = thirdPersonState->thirdPersonFOVControl;
+                fovControl->local.translate.z = -40;
+            }
+
         }
         static inline REL::Relocation<decltype(thunk)> func;
     };
