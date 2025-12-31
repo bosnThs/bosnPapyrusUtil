@@ -13,7 +13,7 @@ Built from https://github.com/libxse/commonlibsse-template
 
 ## Getting Started
 ```bat
-git clone https://github.com/bosnThs/poisonChargesUI
-cd poisonChargesUI
+git clone https://github.com/bosnThs/bosnPapyrusUtil
+cd bosnPapyrusUtil
 .\BuildRelease.bat
 ```
