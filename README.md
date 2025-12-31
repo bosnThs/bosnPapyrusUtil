@@ -1,7 +1,7 @@
 # Custom Actions for SkyrimNet
 
 This is a mod that adds custom actions for SkyrimNet:
-	* Spell Cast Action: NPCs can cast spells.
+* Spell Cast Action: NPCs can cast spells.
 
 
 Built from https://github.com/libxse/commonlibsse-template
