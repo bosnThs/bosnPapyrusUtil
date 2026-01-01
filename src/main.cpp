@@ -1,3 +1,8 @@
+#include <ctime>
+
+static RE::TESObjectREFR* originRef;
+static RE::BSTArray<RE::TESObjectREFR*> currentlyLoadedRefs;
+static time_t lastCheckedTime;
 
 struct myPapyrusUtil
 {
@@ -100,7 +105,9 @@ struct myPapyrusUtil
         //auto player = RE::PlayerCharacter::GetSingleton();
         //clonePackageSpell(a_tag, player, "Sparks", a_pckage);
 
-        //auto s = getNearbyLoadedRefsAsString(a_tag, a_actor, 600, 20);
+        //auto s = getLoadedREFListbyName(a_tag, a_actor, 600, {"Iron Sword" }, true);
+        //s[0]->Disable();
+        //auto a = getNearbyLoadedRefsAsString(a_tag, a_actor, 800, 20, false, 0);
 
 
         std::string inventoryString, weaponString, armorString, potionsString, scrollsString, foodString, ingredientsString, booksString, keysString, miscString = "";
@@ -249,6 +256,8 @@ struct myPapyrusUtil
     static bool clonePackageSpell(RE::StaticFunctionTag* a_tag, RE::Actor* a_actor, std::string a_spell, RE::TESPackage* a_package)
     {
         auto copySpell = getActorHasSpell(a_actor, a_spell);
+        //auto copySpell = a_spell;
+
         if (a_actor && copySpell && a_package)
         {
             //manuall replace packagedata ptr in usemagic package
@@ -280,6 +289,54 @@ struct myPapyrusUtil
         return s;
     }
 
+    static RE::BSTArray<RE::TESObjectREFR*> orderREFListByDistance(RE::TESObjectREFR* a_origin, RE::BSTArray<RE::TESObjectREFR*> a_refList)
+    {
+        std::sort(a_refList.begin(), a_refList.end(),
+            [&a_origin](const RE::TESObjectREFR* lhs, const RE::TESObjectREFR* rhs) {
+                return lhs->GetPosition().GetDistance(a_origin->GetPosition()) < rhs->GetPosition().GetDistance(a_origin->GetPosition());
+            }
+        );
+        return a_refList;
+    }
+
+    static RE::BSTArray<RE::TESObjectREFR*> getAllNearbyRefs(RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs)
+    {
+        auto delta = time(0) - lastCheckedTime;
+        if (originRef == a_origin && delta < 5)
+            return currentlyLoadedRefs;
+        lastCheckedTime = time(0);
+        originRef = a_origin;
+
+        auto tes = RE::TES::GetSingleton();
+        RE::BSTArray<RE::TESObjectREFR*> a_result;
+        int counter = 0;
+
+        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
+            if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
+
+            RE::TESForm* base = a_ref->GetBaseObject();
+            if (!base) return RE::BSContainer::ForEachResult::kContinue;
+
+            std::string displayName = to_lower(a_ref->GetDisplayFullName());
+            if (a_ref != a_origin && a_ref->Is3DLoaded() && displayName != "")
+            {
+                if (a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX") && a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX")->GetFlags() == RE::BSXFlags::Flag::kEditorMarker)
+                    return RE::BSContainer::ForEachResult::kContinue;
+
+                logs::info("(Ref found: {} FormID: {})", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
+                a_result.push_back(a_ref);
+                counter++;
+                if (counter == a_numRefs)
+                    return RE::BSContainer::ForEachResult::kStop;
+                return RE::BSContainer::ForEachResult::kContinue;
+            }
+            return RE::BSContainer::ForEachResult::kContinue;
+            });
+
+        currentlyLoadedRefs = orderREFListByDistance(a_origin, a_result);
+        return currentlyLoadedRefs;
+    }
+
     static RE::TESObjectREFR* getLoadedREFbyName(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, std::string a_npcName)
     {
         auto tes = RE::TES::GetSingleton();
@@ -293,12 +350,12 @@ struct myPapyrusUtil
             if (!base) return RE::BSContainer::ForEachResult::kContinue;
 
             //if (base->Is(RE::FormType::NPC)) 
-                if (a_ref->Is3DLoaded() && to_lower(a_ref->GetDisplayFullName()) == a_npcName)
-                {
-                    logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
-                    a_result = a_ref;
-                    return RE::BSContainer::ForEachResult::kStop;
-                }
+            if (a_ref->Is3DLoaded() && to_lower(a_ref->GetDisplayFullName()) == a_npcName)
+            {
+                logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
+                a_result = a_ref;
+                return RE::BSContainer::ForEachResult::kStop;
+            }
 
             //}
             return RE::BSContainer::ForEachResult::kContinue;
@@ -316,7 +373,7 @@ struct myPapyrusUtil
         int counter = 0;
 
         tes->ForEachReferenceInRange(a_origin, a_distance, [&a_result, &a_stringList, a_allowSteal, &counter](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
-            if (counter == a_stringList.size()) return RE::BSContainer::ForEachResult::kStop;
+            //if (counter == a_stringList.size()) return RE::BSContainer::ForEachResult::kStop;
             if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
 
             RE::TESForm* base = a_ref->GetBaseObject();
@@ -338,8 +395,8 @@ struct myPapyrusUtil
 
                         logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
                         a_result.push_back(a_ref);
-                        iString = "";
-                        counter++;
+                        //iString = "";
+                        //counter++;
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
                 }
@@ -348,100 +405,123 @@ struct myPapyrusUtil
                 return RE::BSContainer::ForEachResult::kContinue;
             });
 
-        return a_result;
-    }
-
-    static std::string getLoadedREFbyTypeAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_formType, bool a_allowSteal = true)
-    {
-        auto tes = RE::TES::GetSingleton();
-        std::string a_result = "";
-        RE::FormType formType;
-
-        switch (a_formType)
+        a_result = orderREFListByDistance(a_origin, a_result);
+        RE::BSTArray<RE::TESObjectREFR*> finalResult;
+        counter = 0;
+        for (auto& ref : a_result)
         {
-            case 26:
-                formType = RE::FormType::Armor;
-                break;
-            case 42:
-                formType = RE::FormType::Ammo;
-                break;
-            case 38:
-                formType = RE::FormType::Tree;
-                break;
-            case 39:
-                formType = RE::FormType::Flora;
-                break;
-            case 30:
-                formType = RE::FormType::Ingredient;
-                break;
-            case 32:
-                formType = RE::FormType::Misc;
-                break;
-            case 48:
-                formType = RE::FormType::Note;
-                break;
-            case 46:
-                formType = RE::FormType::AlchemyItem;
-                break;
-            case 23:
-                formType = RE::FormType::Scroll;
-                break;
-            case 52:
-                formType = RE::FormType::SoulGem;
-                break;
-            case 41:
-                formType = RE::FormType::Weapon;
-                break;
-            case 27:
-                formType = RE::FormType::Book;
-                break;
-        };
-
-
-        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_result, &formType, a_allowSteal](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
-            if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
-
-            RE::TESForm* base = a_ref->GetBaseObject();
-            if (!base) return RE::BSContainer::ForEachResult::kContinue;
-
-            std::string displayName = a_ref->GetDisplayFullName();
-            if (a_ref->Is3DLoaded() && base->GetFormType() == formType && displayName != "")
+            for (auto& iString : a_stringList)
             {
-                if (!a_allowSteal && a_ref->GetOwner() && a_ref->GetOwner() != RE::PlayerCharacter::GetSingleton()->As<RE::TESForm>())
-                    return RE::BSContainer::ForEachResult::kContinue;
-
-                logs::info("(Ref found: {} FormID: {}", displayName, std::format("0x{:x}", a_ref->GetFormID()));
-                a_result += displayName + ",";
+                auto s = to_lower(iString);
+                if (s != "" && to_lower(ref->GetDisplayFullName()) == s)
+                {
+                    finalResult.push_back(ref);
+                    counter++;
+                    iString = "";
+                    if (counter == a_stringList.size())
+                        return finalResult;
+                }
             }
+        }
 
-            //}
-            return RE::BSContainer::ForEachResult::kContinue;
-            });
-
-        return a_result;
+        return finalResult;
     }
 
-    static std::string getNearbyLoadedRefsAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs, bool simple = false)
+    static bool checkFormType(RE::FormType formType, int a_type)
     {
-        auto tes = RE::TES::GetSingleton();
+        //all
+        if (a_type == 0) return true;
+        //items flowers
+        if (a_type == 1 && (formType == RE::FormType::Armor || formType == RE::FormType::Ammo || formType == RE::FormType::Ingredient || formType == RE::FormType::Misc 
+            || formType == RE::FormType::Note || formType == RE::FormType::AlchemyItem || formType == RE::FormType::Scroll || formType == RE::FormType::SoulGem 
+            || formType == RE::FormType::Weapon || formType == RE::FormType::Book || formType == RE::FormType::Flora || formType == RE::FormType::Tree))
+        {
+            return true;
+        }
+        //npcs
+        if (a_type == 2 && formType == RE::FormType::NPC)
+        {
+            return true;
+        }
+        //npcs containers
+        if (a_type == 2 && (formType == RE::FormType::NPC || formType == RE::FormType::Container))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    static std::string getNearbyLoadedRefsAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_origin, float a_distance, int a_numRefs, bool simple, int a_types)
+    {
+        //auto tes = RE::TES::GetSingleton();
         std::string a_result = "";
+
+        if (!a_origin)// || !tes)
+            return a_result;
+
         int counter = 0;
         auto sourcePos = a_origin->GetPosition();
         float sourceYaw = -a_origin->GetAngleZ();
 
-        if (!a_origin)
-            return a_result;
+        RE::BSTArray<RE::TESObjectREFR*> nearbyRefs = getAllNearbyRefs(a_origin, a_distance, a_numRefs);
+        for (auto& a_ref : nearbyRefs)
+        {
+            RE::TESForm* base = a_ref->GetBaseObject();
+            if (!base) continue;
 
-        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs, &sourcePos, &sourceYaw, &simple](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
+            std::string displayName = a_ref->GetDisplayFullName();
+            if (a_ref->Is3DLoaded() && displayName != "" && checkFormType(base->GetFormType(), a_types))
+            {
+                if (a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX") && a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX")->GetFlags() == RE::BSXFlags::Flag::kEditorMarker)
+                    continue;
+
+                RE::NiPoint3 horiz = a_ref->GetPosition() - sourcePos;  horiz.z = 0;
+                RE::NiPoint3 hnorm = horiz;
+                hnorm.Unitize();
+
+                float fwd = hnorm.Dot(RE::NiPoint3(-std::sin(sourceYaw), std::cos(sourceYaw), 0));
+                float rgt = hnorm.Dot(RE::NiPoint3(std::cos(sourceYaw), std::sin(sourceYaw), 0));
+
+                std::string pos;
+                if (horiz.Length() < 100)
+                    pos += "close";
+                if (horiz.Length() > 400)
+                    pos += "far";
+                if (std::abs(fwd) > std::abs(rgt)) {
+                    pos += (fwd > 0) ? " in front" : " behind";
+                }
+                else {
+                    pos += (rgt > 0) ? " to the right" : " to the left";
+                }
+
+                if (simple)
+                {
+                    a_result += displayName + ", ";
+                }
+                else
+                {
+                    a_result += "- " + displayName + " - " + pos + " (" + std::to_string(base->GetFormType()) + ")\n";
+                }
+                counter++;
+                if (counter == a_numRefs)
+                    break;
+            }
+        }
+
+        /*
+        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_origin, &a_result, &counter, &a_numRefs, &sourcePos, &sourceYaw, &simple, &a_types](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
             if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
             if (a_origin == a_ref) return RE::BSContainer::ForEachResult::kContinue;
 
-            RE::TESForm* base = a_ref->GetBaseObject();
             if (!base) return RE::BSContainer::ForEachResult::kContinue;
 
             std::string displayName = a_ref->GetDisplayFullName();
-            if (a_ref->Is3DLoaded() && displayName != "")
+            if (a_ref->Is3DLoaded() && displayName != "" && checkFormType(base->GetFormType(), a_types))
             {
+                if (a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX") && a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX")->GetFlags() == RE::BSXFlags::Flag::kEditorMarker)
+                    return RE::BSContainer::ForEachResult::kContinue;
+
                 RE::NiPoint3 horiz = a_ref->GetPosition() - sourcePos;  horiz.z = 0;
                 RE::NiPoint3 hnorm = horiz;
                 hnorm.Unitize();
@@ -478,6 +558,7 @@ struct myPapyrusUtil
 
             return RE::BSContainer::ForEachResult::kContinue;
             });
+            */
 
         //logs::info("(JSON format: {} ", a_result);
         return a_result;
@@ -504,7 +585,7 @@ struct myPapyrusUtil
         a_vm->RegisterFunction("getActorInventoryAsString", "bosnPapyrusUtil", getActorInventoryAsString, false);
         a_vm->RegisterFunction("inventoryDecorator", "bosnPapyrusUtil", inventoryDecorator, false);
         a_vm->RegisterFunction("getLoadedREFbyName", "bosnPapyrusUtil", getLoadedREFbyName, false);
-        a_vm->RegisterFunction("getLoadedREFbyTypeAsString", "bosnPapyrusUtil", getLoadedREFbyTypeAsString, false);
+        //a_vm->RegisterFunction("getLoadedREFbyTypeAsString", "bosnPapyrusUtil", getLoadedREFbyTypeAsString, false);
         a_vm->RegisterFunction("getLoadedREFListbyName", "bosnPapyrusUtil", getLoadedREFListbyName, false);
         a_vm->RegisterFunction("getNearbyLoadedRefsAsString", "bosnPapyrusUtil", getNearbyLoadedRefsAsString, false);
 
