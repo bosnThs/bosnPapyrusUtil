@@ -100,19 +100,13 @@ struct myPapyrusUtil
 
     static std::string getActorInventoryAsString(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_actor, bool a_showEquip = false)
     {
-        //auto dataHandler = RE::TESDataHandler::GetSingleton();
-        //auto a_pckage = dataHandler->LookupForm<RE::TESPackage>(0x98b9b, "Skyrim.esm");
-        //auto player = RE::PlayerCharacter::GetSingleton();
-        //clonePackageSpell(a_tag, player, "Sparks", a_pckage);
-
-        //auto s = getLoadedREFListbyName(a_tag, a_actor, 600, {"Iron Sword" }, true);
-        //s[0]->Disable();
-        //auto a = getNearbyLoadedRefsAsString(a_tag, a_actor, 800, 20, false, 0);
+        //auto s = findLocation(a_tag, a_actor, "stables");
 
 
         std::string inventoryString, weaponString, armorString, potionsString, scrollsString, foodString, ingredientsString, booksString, keysString, miscString = "";
 
         auto inventory = a_actor->GetInventory();
+
         for (auto& [item, data] : inventory)
         {
             const auto& [count, entry] = data;
@@ -323,7 +317,7 @@ struct myPapyrusUtil
                 if (a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX") && a_ref->GetCurrent3D()->GetExtraData<RE::BSXFlags>("BSX")->GetFlags() == RE::BSXFlags::Flag::kEditorMarker)
                     return RE::BSContainer::ForEachResult::kContinue;
 
-                logs::info("(Ref found: {} FormID: {})", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
+                //logs::info("(Ref found: {} FormID: {})", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
                 a_result.push_back(a_ref);
                 counter++;
                 if (counter == a_numRefs)
@@ -352,7 +346,7 @@ struct myPapyrusUtil
             //if (base->Is(RE::FormType::NPC)) 
             if (a_ref->Is3DLoaded() && to_lower(a_ref->GetDisplayFullName()) == a_npcName)
             {
-                logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
+                //logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
                 a_result = a_ref;
                 return RE::BSContainer::ForEachResult::kStop;
             }
@@ -361,7 +355,7 @@ struct myPapyrusUtil
             return RE::BSContainer::ForEachResult::kContinue;
             });
         if (!a_result)
-            logs::info("(Ref not found: {}", a_npcName);
+            logs::info("Ref not found: {}", a_npcName);
 
         return a_result;
     }
@@ -372,7 +366,7 @@ struct myPapyrusUtil
         RE::BSTArray<RE::TESObjectREFR*> a_result;
         int counter = 0;
 
-        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_result, &a_stringList, a_allowSteal, &counter](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
+        tes->ForEachReferenceInRange(a_origin, a_distance, [&a_result, &a_stringList, &counter](RE::TESObjectREFR* a_ref) -> RE::BSContainer::ForEachResult {
             //if (counter == a_stringList.size()) return RE::BSContainer::ForEachResult::kStop;
             if (!a_ref) return RE::BSContainer::ForEachResult::kContinue;
 
@@ -383,29 +377,26 @@ struct myPapyrusUtil
             {
                 if (iString != "")
                 {
-                    auto s = to_lower(iString);
-                    std::string displayName = to_lower(a_ref->GetDisplayFullName());
-                    if (a_ref->Is3DLoaded() && displayName != "" && displayName == s)
+                    auto bString = to_lower(a_ref->GetDisplayFullName()) == to_lower(iString);
+                    if (a_ref->Is3DLoaded() && a_ref->GetDisplayFullName() != "" && a_ref->GetDisplayFullName() != " " && bString)
                     {
                         //allow steal check
                         //if (!a_allowSteal && a_ref->GetOwner() && a_ref->GetOwner() != RE::PlayerCharacter::GetSingleton()->As<RE::TESForm>() && a_ref->GetOwner() != base->As<RE::TESForm>())
                          //   return RE::BSContainer::ForEachResult::kContinue;
 
-                        //
-
-                        logs::info("(Ref found: {} FormID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
+                        logs::info("getLoadedREFListby Name: {} RefID: {}", a_ref->GetDisplayFullName(), std::format("0x{:x}", a_ref->GetFormID()));
                         a_result.push_back(a_ref);
                         //iString = "";
                         //counter++;
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
                 }
-
              }
-                return RE::BSContainer::ForEachResult::kContinue;
+             return RE::BSContainer::ForEachResult::kContinue;
             });
 
         a_result = orderREFListByDistance(a_origin, a_result);
+        
         RE::BSTArray<RE::TESObjectREFR*> finalResult;
         counter = 0;
         for (auto& ref : a_result)
@@ -415,16 +406,19 @@ struct myPapyrusUtil
                 auto s = to_lower(iString);
                 if (s != "" && to_lower(ref->GetDisplayFullName()) == s)
                 {
+                    logs::info("getLoadedREFListbyFinal Name: {} RefID: {}", ref->GetDisplayFullName(), std::format("0x{:x}", ref->GetFormID()));
                     finalResult.push_back(ref);
                     counter++;
                     iString = "";
                     if (counter == a_stringList.size())
                         return finalResult;
+                    break;
                 }
             }
         }
 
         return finalResult;
+       
     }
 
     static bool checkFormType(RE::FormType formType, int a_type)
@@ -467,6 +461,8 @@ struct myPapyrusUtil
         RE::BSTArray<RE::TESObjectREFR*> nearbyRefs = getAllNearbyRefs(a_origin, a_distance, a_numRefs);
         for (auto& a_ref : nearbyRefs)
         {
+            if (!a_ref) continue;
+
             RE::TESForm* base = a_ref->GetBaseObject();
             if (!base) continue;
 
@@ -564,11 +560,70 @@ struct myPapyrusUtil
         return a_result;
     }
 
-    static void test()
-    {
-        auto manager = RE::BGSCreatedObjectManager::GetSingleton();
-        auto a = RE::BGSCreatedObjectManager::CreatedMagicItemData();
+    static std::vector<std::string> split(std::string s, std::string delimiter) {
+        size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+        std::string token;
+        std::vector<std::string> res;
 
+        while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+            token = s.substr(pos_start, pos_end - pos_start);
+            pos_start = pos_end + delim_len;
+            res.push_back(token);
+        }
+
+        res.push_back(s.substr(pos_start));
+        return res;
+    }
+
+    static RE::TESObjectREFR* findLocation(RE::StaticFunctionTag* a_tag, RE::TESObjectREFR* a_source, std::string a_location)
+    {
+        logs::info("findLocation looking for: {}", a_location);
+        a_location = to_lower(a_location);
+        std::vector<std::string> locationStrings = split(a_location, " ");
+        int score = 0;
+        RE::TESObjectREFR* l_index = nullptr;
+        auto& locationList = RE::TESDataHandler::GetSingleton()->GetFormArray(RE::FormType::Location);
+        for (auto& loc : locationList)
+        {
+            RE::TESObjectREFR* ref = loc->As<RE::BGSLocation>()->worldLocMarker.get().get();
+            if (!ref)   //no world marker
+            {
+                for (auto& specialRef : loc->As<RE::BGSLocation>()->specialRefs)
+                {   //locationcentermarker                      housemaindooreftype                 mapmarkerreftype
+                    if (specialRef.type->formID == 0x1bdf1 || specialRef.type->formID == 0x70e64 || specialRef.type->formID == 0x10f63c)
+                    {
+                        ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(specialRef.refData.refID);
+                        break;
+                    }
+                }
+                if (!ref)   //ignoring this location
+                    continue;
+            }
+
+            std::string locString = to_lower(loc->GetName());
+            if (locString == a_location)
+            {
+                logs::info("findLocation Name: {} equal Name!", locString);
+                return ref;
+            }
+
+            int temp = 0;
+            for (auto& l : locationStrings)
+            {
+                if (locString.contains(l))
+                    temp += l.length();
+            }
+
+            if (temp > score || temp == score && l_index && a_source->GetPosition().GetDistance(ref->GetPosition()) < 
+                a_source->GetPosition().GetDistance(l_index->GetPosition()))
+            {
+                logs::info("findLocation Name: {} score: {}", locString, temp);
+                score = temp;
+                l_index = ref;
+            }
+
+        }
+        return l_index;
     }
 
     static bool RegisterFuncsForSKSE(RE::BSScript::IVirtualMachine* a_vm) {
@@ -588,6 +643,7 @@ struct myPapyrusUtil
         //a_vm->RegisterFunction("getLoadedREFbyTypeAsString", "bosnPapyrusUtil", getLoadedREFbyTypeAsString, false);
         a_vm->RegisterFunction("getLoadedREFListbyName", "bosnPapyrusUtil", getLoadedREFListbyName, false);
         a_vm->RegisterFunction("getNearbyLoadedRefsAsString", "bosnPapyrusUtil", getNearbyLoadedRefsAsString, false);
+        a_vm->RegisterFunction("findLocation", "bosnPapyrusUtil", findLocation, false);
 
         return true;
     }

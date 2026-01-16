@@ -10,3 +10,4 @@ ObjectReference Function getLoadedREFbyName(ObjectReference a_origin, float a_di
 ;String Function getLoadedREFbyTypeAsString(ObjectReference a_origin, float a_distance, int a_formType, bool a_allowSteal) global native 
 ObjectReference[] Function getLoadedREFListbyName(ObjectReference a_origin, float a_distance, String[] a_stringList, bool a_allowSteal) global native 
 String Function getNearbyLoadedRefsAsString(ObjectReference a_origin, float a_distance, int a_numRefs, bool simple, int a_types) global native 
+ObjectReference Function findLocation(ObjectReference a_source, string a_destination) global native 
